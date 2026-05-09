@@ -863,10 +863,34 @@
   // ============================================================
   // BIND
   // ============================================================
-  buildAll();
-  document.getElementById('u18-begin').addEventListener('click', begin);
-  document.getElementById('u18-prev').addEventListener('click', goPrev);
-  document.getElementById('u18-next').addEventListener('click', goNext);
-  document.getElementById('u18-download').addEventListener('click', generatePDF);
+  function init() {
+    try { buildAll(); } catch (e) { console.error('PPP buildAll error:', e); }
+
+    function bind(id, evt, fn) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener(evt, fn);
+      else console.warn('PPP element missing:', id);
+    }
+
+    bind('u18-begin', 'click', begin);
+    bind('u18-prev', 'click', goPrev);
+    bind('u18-next', 'click', goNext);
+    bind('u18-download', 'click', function (e) {
+      try {
+        if (e && e.preventDefault) e.preventDefault();
+        generatePDF();
+      } catch (err) {
+        console.error('PPP PDF error:', err);
+        alert('Something went wrong generating the PDF. Please screenshot this message and send it to Tim: ' + (err && err.message ? err.message : err));
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    // DOM already ready — run immediately
+    init();
+  }
 
 })();
