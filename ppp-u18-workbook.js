@@ -942,7 +942,29 @@
     bind('u18-begin', 'click', begin);
     bind('u18-prev', 'click', goPrev);
     bind('u18-next', 'click', goNext);
-    bind('u18-download', 'click', generatePDF);
+
+    // Download button — bind with extra diagnostics so we can prove the handler fires
+    var dlBtn = document.getElementById('u18-download');
+    if (dlBtn) {
+      dlBtn.addEventListener('click', function (e) {
+        // Visible proof that the click was received
+        dlBtn.textContent = 'Click received, building...';
+        dlBtn.style.background = '#E03535';
+        // Now run the real generator
+        setTimeout(function () {
+          try {
+            generatePDF();
+          } catch (err) {
+            alert('Generator threw: ' + (err && err.message ? err.message : err));
+          }
+        }, 100);
+      });
+    } else {
+      // The button doesn't exist in the DOM at init time — defer
+      // and try again when complete() shows it.
+      window._pppDlButtonMissing = true;
+      console.warn('PPP: u18-download not found at init');
+    }
   }
 
   if (document.readyState === 'loading') {
