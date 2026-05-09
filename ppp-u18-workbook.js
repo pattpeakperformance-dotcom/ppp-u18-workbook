@@ -496,8 +496,75 @@
   // ============================================================
   // PDF GENERATION
   // ============================================================
+
+  // Load jsPDF on demand. Returns a Promise that resolves to the jsPDF constructor.
+  // This works around iframe sandbox issues where window.jspdf isn't reliably
+  // available to scripts loaded via separate <script> tags.
+  function loadJsPDF() {
+    return new Promise(function (resolve, reject) {
+      // If jsPDF is already loaded and accessible, use it
+      if (window.jspdf && window.jspdf.jsPDF) {
+        resolve(window.jspdf.jsPDF);
+        return;
+      }
+
+      // Otherwise, load it fresh into this exact context
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = function () {
+        if (window.jspdf && window.jspdf.jsPDF) {
+          resolve(window.jspdf.jsPDF);
+        } else {
+          reject(new Error('jsPDF loaded but window.jspdf is not available'));
+        }
+      };
+      s.onerror = function () {
+        reject(new Error('Failed to load jsPDF from CDN. Check internet connection.'));
+      };
+      document.head.appendChild(s);
+
+      // Timeout fallback in case onload never fires
+      setTimeout(function () {
+        if (window.jspdf && window.jspdf.jsPDF) resolve(window.jspdf.jsPDF);
+      }, 4000);
+    });
+  }
+
   function generatePDF() {
-    var jsPDF = window.jspdf.jsPDF;
+    // Show feedback immediately so the user knows the click registered
+    var btn = document.getElementById('u18-download');
+    var originalText = btn ? btn.textContent : '';
+    if (btn) {
+      btn.textContent = 'Building your PDF...';
+      btn.disabled = true;
+    }
+
+    loadJsPDF().then(function (jsPDF) {
+      try {
+        buildPDFDocument(jsPDF);
+        if (btn) {
+          btn.textContent = originalText;
+          btn.disabled = false;
+        }
+      } catch (err) {
+        if (btn) {
+          btn.textContent = originalText;
+          btn.disabled = false;
+        }
+        console.error('PPP PDF build error:', err);
+        alert('Sorry, something went wrong building the PDF. Please screenshot this and send it to Tim:\n\n' + (err && err.message ? err.message : err));
+      }
+    }).catch(function (err) {
+      if (btn) {
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+      console.error('PPP PDF load error:', err);
+      alert('Sorry, the PDF builder couldn\'t load. Please check your internet connection and try again. If it keeps failing, screenshot this and send to Tim:\n\n' + (err && err.message ? err.message : err));
+    });
+  }
+
+  function buildPDFDocument(jsPDF) {
     var doc = new jsPDF({ unit: 'pt', format: 'a4' });
 
     var PAGE_W = doc.internal.pageSize.getWidth();   // ~595
@@ -875,15 +942,7 @@
     bind('u18-begin', 'click', begin);
     bind('u18-prev', 'click', goPrev);
     bind('u18-next', 'click', goNext);
-    bind('u18-download', 'click', function (e) {
-      try {
-        if (e && e.preventDefault) e.preventDefault();
-        generatePDF();
-      } catch (err) {
-        console.error('PPP PDF error:', err);
-        alert('Something went wrong generating the PDF. Please screenshot this message and send it to Tim: ' + (err && err.message ? err.message : err));
-      }
-    });
+    bind('u18-download', 'click', generatePDF);
   }
 
   if (document.readyState === 'loading') {
